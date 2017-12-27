@@ -1,0 +1,6 @@
+[package]
+name = "rastebin"
+version = "0.1.0"
+authors = ["Iori Yoneji <yoneji_i@worksap.co.jp>"]
+
+[dependencies]
