@@ -12,11 +12,11 @@ use std::io;
 
 fn list_posts() -> String {
     if let Ok(posts) = fs::read_dir("posts") {
-        let list: Vec<String> = posts.map(/* map to all DirEntry */
+        let list = posts.map(/* map to all DirEntry */
                 |ent| ent.ok().map( /* FnOnce for Result of DirEntry */
                     |p| p.path().to_string_lossy().clone().to_string()
-                ).unwrap()).collect();
-        unreachable!();
+                ).unwrap());
+        list.fold("".to_string(), |acc, x| { acc + x.as_ref() })
 
     } else {
         "".to_string()
