@@ -1,5 +1,7 @@
 extern crate iron;
 extern crate router;
+extern crate rand;
+extern crate base64;
 
 use iron::prelude;
 use iron::status;
@@ -9,6 +11,8 @@ use std::fs::File;
 use std::io::Read;
 use std::borrow::Cow;
 use std::io;
+use rand::{Rng, thread_rng};
+use base64::encode_config;
 
 fn list_posts() -> String {
     if let Ok(posts) = fs::read_dir("posts") {
@@ -16,7 +20,7 @@ fn list_posts() -> String {
                 |ent| ent.ok().map( /* FnOnce for Result of DirEntry */
                     |p| p.path().to_string_lossy().clone().to_string()
                 ).unwrap());
-        list.fold("".to_string(), |acc, x| { acc + x.as_ref() })
+        list.fold("".to_string(), |acc, x| { acc + "\n" + x.as_ref() })
 
     } else {
         "".to_string()
@@ -40,8 +44,16 @@ fn raw(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     }
 }
 
+fn generate_random_name() -> String {
+    let rng = thread_rng();
+    let candidate = encode_config(& rng.gen_iter::<u8>().take(4).collect::<Vec<u8>>(), base64::URL_SAFE_NO_PAD);
+    println!("{}\n", candidate);
+    return candidate;
+}
+
 fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
-    let mut writer: Vec<u8> = vec![];
+    let fname = generate_random_name();
+    let mut writer = File::create(fname).unwrap();
     io::copy(&mut req.body, &mut writer);
     unreachable!();
 }
