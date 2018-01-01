@@ -54,11 +54,12 @@ fn generate_random_name() -> String {
 
 fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     let mut fname = format!("posts/{}", generate_random_name());
-    let mut writer = File::create(&fname);
-    while writer.is_err() {
+    let mut open = File::open(&fname);
+    while open.is_ok() {
         fname = fname + "_";
-        let mut writer = File::create(&fname);
+        open = File::open(&fname);
     }
+    let mut writer = File::create(&fname);
 
     println!("Created {} at {} by request from {}", fname, Local::now(), req.remote_addr);
     let copied = io::copy(&mut req.body, &mut writer.unwrap());
