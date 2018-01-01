@@ -48,15 +48,20 @@ fn raw(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
 
 fn generate_random_name() -> String {
     let mut rng = thread_rng();
-    let candidate = encode_config(& rng.gen_iter::<u8>().take(4).collect::<Vec<u8>>(), base64::URL_SAFE_NO_PAD);
+    let candidate = encode_config(& rng.gen_iter::<u8>().take(6).collect::<Vec<u8>>(), base64::URL_SAFE_NO_PAD);
     return candidate;
 }
 
 fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
-    let fname = format!("posts/{}", generate_random_name());
+    let mut fname = format!("posts/{}", generate_random_name());
+    let mut writer = File::create(&fname);
+    while writer.is_err() {
+        fname = fname + "_";
+        let mut writer = File::create(&fname);
+    }
+
     println!("Created {} at {} by request from {}", fname, Local::now(), req.remote_addr);
-    let mut writer = File::create(fname).unwrap();
-    let copied = io::copy(&mut req.body, &mut writer);
+    let copied = io::copy(&mut req.body, &mut writer.unwrap());
     match copied {
         Ok(_) => Ok(iron::Response::with((status::Ok, ""))),
         Err(e) => Ok(iron::Response::with((status::InternalServerError, e.description()))),
