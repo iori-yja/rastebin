@@ -1,9 +1,11 @@
 extern crate base64;
+extern crate chrono;
 extern crate iron;
 extern crate router;
 extern crate rand;
 
 use base64::encode_config;
+use chrono::offset::Local;
 use iron::status;
 use rand::{Rng, thread_rng};
 use router::Router;
@@ -18,10 +20,10 @@ fn list_posts() -> String {
     if let Ok(posts) = fs::read_dir("posts") {
         let list = posts.map(/* map to all DirEntry */
                 |ent| ent.ok().map( /* FnOnce for Result of DirEntry */
-                    |p| p.path().to_string_lossy().clone().to_string()
+                    //|p| p.path().to_string_lossy().to_string()
+                    |p| p.path().file_name().unwrap().to_string_lossy().to_string()
                 ).unwrap());
-        list.fold("".to_string(), |acc, x| { acc + "\n" + x.as_ref() })
-
+        list.fold("".to_string(), |acc, x| { acc + x.as_ref() + "\n" })
     } else {
         "".to_string()
     }
@@ -47,14 +49,14 @@ fn raw(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
 fn generate_random_name() -> String {
     let mut rng = thread_rng();
     let candidate = encode_config(& rng.gen_iter::<u8>().take(4).collect::<Vec<u8>>(), base64::URL_SAFE_NO_PAD);
-    println!("{}\n", candidate);
     return candidate;
 }
 
 fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
-    let fname = generate_random_name();
+    let fname = format!("posts/{}", generate_random_name());
+    println!("Created {} at {} by request from {}", fname, Local::now(), req.remote_addr);
     let mut writer = File::create(fname).unwrap();
-    let mut copied = io::copy(&mut req.body, &mut writer);
+    let copied = io::copy(&mut req.body, &mut writer);
     match copied {
         Ok(_) => Ok(iron::Response::with((status::Ok, ""))),
         Err(e) => Ok(iron::Response::with((status::InternalServerError, e.description()))),
@@ -68,6 +70,7 @@ fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
 fn main() {
     let mut chain = Router::new();
     chain.post("/posts/new", new, "newpost");
+    chain.get("/posts/lists", raw, "listpost");
     chain.get("/posts/raw/:location", raw, "getpost");
     chain.get("/posts/:location", show, "showpost");
 
