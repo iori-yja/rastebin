@@ -1,18 +1,18 @@
+extern crate base64;
 extern crate iron;
 extern crate router;
 extern crate rand;
-extern crate base64;
 
-use iron::prelude;
+use base64::encode_config;
 use iron::status;
+use rand::{Rng, thread_rng};
 use router::Router;
+use std::error::Error;
 use std::fs;
 use std::fs::File;
-use std::io::Read;
-use std::borrow::Cow;
+use std::prelude;
 use std::io;
-use rand::{Rng, thread_rng};
-use base64::encode_config;
+use std::io::Read;
 
 fn list_posts() -> String {
     if let Ok(posts) = fs::read_dir("posts") {
@@ -45,7 +45,7 @@ fn raw(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
 }
 
 fn generate_random_name() -> String {
-    let rng = thread_rng();
+    let mut rng = thread_rng();
     let candidate = encode_config(& rng.gen_iter::<u8>().take(4).collect::<Vec<u8>>(), base64::URL_SAFE_NO_PAD);
     println!("{}\n", candidate);
     return candidate;
@@ -54,8 +54,11 @@ fn generate_random_name() -> String {
 fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     let fname = generate_random_name();
     let mut writer = File::create(fname).unwrap();
-    io::copy(&mut req.body, &mut writer);
-    unreachable!();
+    let mut copied = io::copy(&mut req.body, &mut writer);
+    match copied {
+        Ok(_) => Ok(iron::Response::with((status::Ok, ""))),
+        Err(e) => Ok(iron::Response::with((status::InternalServerError, e.description()))),
+    }
 }
 
 fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
@@ -64,7 +67,6 @@ fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
 
 fn main() {
     let mut chain = Router::new();
-    let rootdir = "/";
     chain.post("/posts/new", new, "newpost");
     chain.get("/posts/raw/:location", raw, "getpost");
     chain.get("/posts/:location", show, "showpost");
