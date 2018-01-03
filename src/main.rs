@@ -14,7 +14,7 @@ use std::fs;
 use std::fs::File;
 use std::prelude;
 use std::io;
-use std::io::Read;
+use std::io::{Read, BufReader};
 
 fn list_posts() -> String {
     if let Ok(posts) = fs::read_dir("posts") {
@@ -29,8 +29,8 @@ fn list_posts() -> String {
     }
 }
 
-fn find_post(loc: &str) -> Option<Vec<u8>> {
-    fs::File::open(loc).map(|x| x.bytes().map(|x| x.unwrap()).collect()).ok()
+fn find_post(loc: &str) -> std::io::Result<BufReader<File>> {
+    fs::File::open(loc).map(|x| BufReader::new(x))
 }
 
 fn raw(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
@@ -38,7 +38,7 @@ fn raw(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     if loc.is_none() {
         Ok(iron::Response::with((status::Ok, list_posts())))
     } else {
-        if let Some(post) = find_post(loc.unwrap()) {
+        if let Ok(post) = find_post(&format!("posts/{}", loc.unwrap())) {
             Ok(iron::Response::with((status::Ok, post)))
         } else {
             Ok(iron::Response::with((status::NotFound, "")))
@@ -70,6 +70,18 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
 }
 
 fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
+    /*
+    let loc = req.extensions.get::<Router>().unwrap().find("location");
+    if loc.is_none() {
+        Ok(iron::Response::with((status::Ok, list_posts())))
+    } else {
+        if let Some(post) = find_post(&format!("posts/{}", loc.unwrap())) {
+            Ok(iron::Response::with((status::Ok, post)))
+        } else {
+            Ok(iron::Response::with((status::NotFound, "")))
+        }
+    }
+    */
     unreachable!();
 }
 
