@@ -7,6 +7,7 @@ extern crate rand;
 use base64::encode_config;
 use chrono::offset::Local;
 use iron::status;
+use iron::response;
 use rand::{Rng, thread_rng};
 use router::Router;
 use std::error::Error;
@@ -39,7 +40,7 @@ fn raw(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
         Ok(iron::Response::with((status::Ok, list_posts())))
     } else {
         if let Ok(post) = find_post(&format!("posts/{}", loc.unwrap())) {
-            Ok(iron::Response::with((status::Ok, post)))
+            Ok(iron::Response::with((status::Ok, response::BodyReader(post))))
         } else {
             Ok(iron::Response::with((status::NotFound, "")))
         }
