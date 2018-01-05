@@ -18,16 +18,16 @@ use std::prelude;
 use std::io;
 use std::io::{Read, BufReader};
 
-fn list_posts() -> String {
+fn list_posts() -> Option<Vec<String>> {
     if let Ok(posts) = fs::read_dir("posts") {
         let list = posts.map(/* map to all DirEntry */
                 |ent| ent.ok().map( /* FnOnce for Result of DirEntry */
                     //|p| p.path().to_string_lossy().to_string()
                     |p| p.path().file_name().unwrap().to_string_lossy().to_string()
                 ).unwrap());
-        list.fold("".to_string(), |acc, x| { acc + x.as_ref() + "\n" })
+        Some(list.collect())
     } else {
-        "".to_string()
+        None
     }
 }
 
@@ -38,7 +38,7 @@ fn find_post(loc: &str) -> std::io::Result<BufReader<File>> {
 fn raw(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     let loc = req.extensions.get::<Router>().unwrap().find("location");
     if loc.is_none() {
-        Ok(iron::Response::with((status::Ok, list_posts())))
+        unreachable!();
     } else {
         if let Ok(post) = find_post(&format!("posts/{}", loc.unwrap())) {
             Ok(iron::Response::with((status::Ok, response::BodyReader(post))))
@@ -74,7 +74,8 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
 fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     let loc = req.extensions.get::<Router>().unwrap().find("location");
     if loc.is_none() {
-        Ok(iron::Response::with((status::Ok, list_posts())))
+        let posts = list_posts().map(|x| x.iter().fold(String::new(), |acc, p| acc + format!("<a href={p}>{p}</a><br>", p=p).as_ref()));
+        Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, posts.unwrap())))
     } else {
         if let Ok(post) = find_post(&format!("posts/{}", loc.unwrap())) {
             let mut body: String = "".to_string();
@@ -92,9 +93,9 @@ fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
 fn main() {
     let mut chain = Router::new();
     chain.post("/posts/new", new, "newpost");
-    chain.get("/posts/lists", raw, "listpost");
     chain.get("/posts/raw/:location", raw, "getpost");
     chain.get("/posts/:location", show, "showpost");
+    chain.get("/posts/", show, "listpost");
 
     iron::Iron::new(chain).http("localhost:3000").unwrap();
 }
