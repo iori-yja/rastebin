@@ -76,9 +76,11 @@ fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
         Ok(iron::Response::with((status::Ok, list_posts())))
     } else {
         if let Ok(mut post) = find_post(&format!("posts/{}", loc.unwrap())) {
-            let mut response_buffer = vec![];
-            post.read_until(256, &mut response_buffer);
-            let res = format!(include_str!("template.html"), title=loc.unwrap(), body=String::from_utf8(response_buffer).unwrap());
+            let mut body: String = "".to_string();
+            post.take(2048).read_to_string(&mut body);
+            let res = format!(include_str!("template.html"),
+                              title=loc.unwrap(),
+                              body=body);
             Ok(iron::Response::with((status::Ok, res)))
         } else {
             Ok(iron::Response::with((status::NotFound, "")))
