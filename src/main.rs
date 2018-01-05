@@ -15,7 +15,7 @@ use std::fs;
 use std::fs::File;
 use std::prelude;
 use std::io;
-use std::io::{Read, BufReader};
+use std::io::{Read, BufRead, BufReader};
 
 fn list_posts() -> String {
     if let Ok(posts) = fs::read_dir("posts") {
@@ -71,19 +71,19 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
 }
 
 fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
-    /*
     let loc = req.extensions.get::<Router>().unwrap().find("location");
     if loc.is_none() {
         Ok(iron::Response::with((status::Ok, list_posts())))
     } else {
-        if let Some(post) = find_post(&format!("posts/{}", loc.unwrap())) {
-            Ok(iron::Response::with((status::Ok, post)))
+        if let Ok(mut post) = find_post(&format!("posts/{}", loc.unwrap())) {
+            let mut response_buffer = vec![];
+            post.read_until(256, &mut response_buffer);
+            let res = format!(include_str!("template.html"), title=loc.unwrap(), body=String::from_utf8(response_buffer).unwrap());
+            Ok(iron::Response::with((status::Ok, res)))
         } else {
             Ok(iron::Response::with((status::NotFound, "")))
         }
     }
-    */
-    unreachable!();
 }
 
 fn main() {
