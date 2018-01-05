@@ -15,7 +15,7 @@ use std::fs;
 use std::fs::File;
 use std::prelude;
 use std::io;
-use std::io::{Read, BufRead, BufReader};
+use std::io::{Read, BufReader};
 
 fn list_posts() -> String {
     if let Ok(posts) = fs::read_dir("posts") {
@@ -60,12 +60,12 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
         fname = fname + "_";
         open = File::open(&fname);
     }
-    let mut writer = File::create(&fname);
+    let writer = File::create(&fname);
 
     println!("Created {} at {} by request from {}", fname, Local::now(), req.remote_addr);
     let copied = io::copy(&mut req.body, &mut writer.unwrap());
     match copied {
-        Ok(_) => Ok(iron::Response::with((status::Ok, ""))),
+        Ok(_) => Ok(iron::Response::with((status::Ok, fname))),
         Err(e) => Ok(iron::Response::with((status::InternalServerError, e.description()))),
     }
 }
@@ -75,13 +75,13 @@ fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     if loc.is_none() {
         Ok(iron::Response::with((status::Ok, list_posts())))
     } else {
-        if let Ok(mut post) = find_post(&format!("posts/{}", loc.unwrap())) {
+        if let Ok(post) = find_post(&format!("posts/{}", loc.unwrap())) {
             let mut body: String = "".to_string();
             post.take(2048).read_to_string(&mut body);
             let res = format!(include_str!("template.html"),
                               title=loc.unwrap(),
                               body=body);
-            Ok(iron::Response::with((status::Ok, res)))
+            Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, res)))
         } else {
             Ok(iron::Response::with((status::NotFound, "")))
         }
