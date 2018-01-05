@@ -3,6 +3,7 @@ extern crate chrono;
 extern crate iron;
 extern crate router;
 extern crate rand;
+extern crate htmlescape;
 
 use base64::encode_config;
 use chrono::offset::Local;
@@ -80,7 +81,7 @@ fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
             post.take(2048).read_to_string(&mut body);
             let res = format!(include_str!("template.html"),
                               title=loc.unwrap(),
-                              body=body);
+                              body=htmlescape::encode_minimal(&body));
             Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, res)))
         } else {
             Ok(iron::Response::with((status::NotFound, "")))
