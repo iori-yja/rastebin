@@ -18,14 +18,21 @@ use std::prelude;
 use std::io;
 use std::io::{Read, BufReader};
 
-fn list_posts() -> Option<Vec<String>> {
+fn describe_post(fname: &str) -> String {
+    println!("{}", &fname);
+    let mut desc = String::new();
+    let mut file = fs::File::open(fname.to_string() + ".metadata").map(|x| BufReader::new(x)).unwrap();
+    file.read_to_string(&mut desc);
+    return desc;
+}
+
+fn list_posts() -> Option<Vec<(String, String)>> {
     if let Ok(posts) = fs::read_dir("posts") {
         let list = posts.map(/* map to all DirEntry */
                 |ent| ent.ok().map( /* FnOnce for Result of DirEntry */
-                    //|p| p.path().to_string_lossy().to_string()
                     |p| p.path().file_name().unwrap().to_string_lossy().to_string()
                 ).unwrap());
-        Some(list.collect())
+        Some(list.map(|l| (l.clone(), describe_post(&l))).collect())
     } else {
         None
     }
@@ -74,7 +81,12 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
 fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     let loc = req.extensions.get::<Router>().unwrap().find("location");
     if loc.is_none() {
-        let posts = list_posts().map(|x| x.iter().fold(String::new(), |acc, p| acc + format!("<a href={p}>{p}</a><br>", p=p).as_ref()));
+        let resp_before = "<html><body><table><tr><th></th><th>description</th></tr>";
+        let posts = list_posts()
+                    .map(|x| x.iter()
+                         .fold(String::new(),
+                            |acc, p| acc + format!("<tr><td><a href={p}><tt>{p}</tt></a></td><td>{d}</td></tr>", p=p.0, d=p.1).as_ref()));
+        let resp_after = "</table></body></html>";
         Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, posts.unwrap())))
     } else {
         if let Ok(post) = find_post(&format!("posts/{}", loc.unwrap())) {
