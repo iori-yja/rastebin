@@ -16,12 +16,11 @@ use std::fs;
 use std::fs::File;
 use std::prelude;
 use std::io;
-use std::io::{Read, BufReader};
+use std::io::{Read, Write, BufReader, BufWriter};
 
 fn describe_post(fname: &str) -> String {
-    println!("{}", &fname);
     let mut desc = String::new();
-    if let Ok(mut file) = fs::File::open(fname.to_string() + ".metadata").map(|x| BufReader::new(x)) {
+    if let Ok(mut file) = fs::File::open(format!("metadata/{}.metadata", fname)).map(|x| BufReader::new(x)) {
         file.read_to_string(&mut desc);
         return desc;
     } else {
@@ -73,10 +72,15 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     }
     let writer = File::create(&fname);
 
-    println!("Created {} at {} by request from {}", fname, Local::now(), req.remote_addr);
     let copied = io::copy(&mut req.body, &mut writer.unwrap());
     match copied {
-        Ok(_) => Ok(iron::Response::with((status::Ok, fname))),
+        Ok(byte) => {
+            let metalog = format!("Created {} ({}bytes) at {} by request from {}", fname, byte, Local::now(), req.remote_addr);
+            let mut meta = BufWriter::new(File::create(fname.clone() + ".metadata").unwrap());
+            println!("{}", metalog);
+            meta.write(metalog.as_bytes()).unwrap();
+            Ok(iron::Response::with((status::Ok, fname)))
+        },
         Err(e) => Ok(iron::Response::with((status::InternalServerError, e.description()))),
     }
 }
@@ -90,7 +94,7 @@ fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
                          .fold(String::new(),
                             |acc, p| acc + format!("<tr><td><a href={p}><tt>{p}</tt></a></td><td>{d}</td></tr>", p=p.0, d=p.1).as_ref()));
         let resp_after = "</table></body></html>";
-        Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, posts.unwrap())))
+        Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, resp_before.to_string() + posts.unwrap().as_ref() + resp_after)))
     } else {
         if let Ok(post) = find_post(&format!("posts/{}", loc.unwrap())) {
             let mut body: String = "".to_string();
