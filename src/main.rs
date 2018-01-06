@@ -21,9 +21,12 @@ use std::io::{Read, BufReader};
 fn describe_post(fname: &str) -> String {
     println!("{}", &fname);
     let mut desc = String::new();
-    let mut file = fs::File::open(fname.to_string() + ".metadata").map(|x| BufReader::new(x)).unwrap();
-    file.read_to_string(&mut desc);
-    return desc;
+    if let Ok(mut file) = fs::File::open(fname.to_string() + ".metadata").map(|x| BufReader::new(x)) {
+        file.read_to_string(&mut desc);
+        return desc;
+    } else {
+        return "unknown".into();
+    }
 }
 
 fn list_posts() -> Option<Vec<(String, String)>> {
