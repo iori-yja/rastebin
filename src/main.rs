@@ -15,7 +15,6 @@ use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::prelude;
-use std::io;
 use std::io::{Read, Write, BufReader, BufWriter};
 
 fn describe_post(fname: &str) -> String {
@@ -75,10 +74,11 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     let copied = io::copy(&mut req.body, &mut writer.unwrap());
     match copied {
         Ok(byte) => {
-            let metalog = format!("Created {} ({}bytes) at {} by request from {}", fname, byte, Local::now(), req.remote_addr);
+            let time = Local::now();
+            println!("Created {} ({}bytes) at {} by request from {}", fname, byte, time, req.remote_addr);
             let mut meta = BufWriter::new(File::create(fname.clone() + ".metadata").unwrap());
-            println!("{}", metalog);
-            meta.write(metalog.as_bytes()).unwrap();
+            /* The format of metadata is CSV; specifically, see below */
+            meta.write(format!("{},{},{}", byte, time, req.remote_addr).as_bytes()).unwrap();
             Ok(iron::Response::with((status::Ok, fname)))
         },
         Err(e) => Ok(iron::Response::with((status::InternalServerError, e.description()))),
@@ -101,7 +101,9 @@ fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
             post.take(2048).read_to_string(&mut body);
             let res = format!(include_str!("template.html"),
                               title=loc.unwrap(),
-                              body=htmlescape::encode_minimal(&body));
+                              body=htmlescape::encode_minimal(&body),
+                              body_header="",
+                              body_footer="");
             Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, res)))
         } else {
             Ok(iron::Response::with((status::NotFound, "")))
