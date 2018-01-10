@@ -49,7 +49,7 @@ fn raw(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
         unreachable!();
     } else {
         if let Ok(post) = find_post(&format!("posts/{}", loc.unwrap())) {
-            Ok(iron::Response::with((status::Ok, response::BodyReader(post))))
+            Ok(iron::Response::with((status::Ok, iron::headers::ContentType::plaintext().0, response::BodyReader(post))))
         } else {
             Ok(iron::Response::with((status::NotFound, "")))
         }
@@ -85,6 +85,10 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     }
 }
 
+fn form(_: &mut iron::Request) -> iron::iron::IronResult<Iron::Response> {
+    Ok(iron::Response::with((status::Ok, iron::headers::ContentType::html().0, include_str!("template.html"))))
+}
+
 fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     let loc = req.extensions.get::<Router>().unwrap().find("location");
     if loc.is_none() {
@@ -114,6 +118,7 @@ fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
 fn main() {
     let mut chain = Router::new();
     chain.post("/posts/new", new, "newpost");
+    chain.get("/posts/new", form, "newform");
     chain.get("/posts/raw/:location", raw, "getpost");
     chain.get("/posts/:location", show, "showpost");
     chain.get("/posts/", show, "listpost");
