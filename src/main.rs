@@ -15,6 +15,7 @@ use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::prelude;
+use std::io;
 use std::io::{Read, Write, BufReader, BufWriter};
 
 fn describe_post(fname: &str) -> String {
@@ -85,7 +86,7 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     }
 }
 
-fn form(_: &mut iron::Request) -> iron::iron::IronResult<Iron::Response> {
+fn form(_: &mut iron::Request) -> iron::IronResult<iron::Response> {
     Ok(iron::Response::with((status::Ok, iron::headers::ContentType::html().0, include_str!("template.html"))))
 }
 
