@@ -99,7 +99,7 @@ fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
                          .fold(String::new(),
                             |acc, p| acc + format!("<tr><td><a href={p}><tt>{p}</tt></a></td><td>{d}</td></tr>", p=p.0, d=p.1).as_ref()));
         let resp_after = "</table></body></html>";
-        Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, resp_before.to_string() + posts.unwrap().as_ref() + resp_after)))
+        Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, resp_before.to_string() + posts.unwrap_or("".to_string()).as_ref() + resp_after)))
     } else {
         if let Ok(post) = find_post(&format!("posts/{}", loc.unwrap())) {
             let mut body: String = "".to_string();
