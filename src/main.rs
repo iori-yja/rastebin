@@ -87,32 +87,32 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
 }
 
 fn form(_: &mut iron::Request) -> iron::IronResult<iron::Response> {
-    Ok(iron::Response::with((status::Ok, iron::headers::ContentType::html().0, include_str!("template.html"))))
+    Ok(iron::Response::with((status::Ok, iron::headers::ContentType::html().0, include_str!("form.html"))))
+}
+
+fn showtable(_: &mut iron::Request) -> iron::IronResult<iron::Response> {
+    let resp_before = "<html><body><table><tr><th></th><th>description</th></tr>";
+    let posts = list_posts()
+                .map(|x| x.iter()
+                     .fold(String::new(),
+                        |acc, p| acc + format!("<tr><td><a href={p}><tt>{p}</tt></a></td><td>{d}</td></tr>", p=p.0, d=p.1).as_ref()));
+    let resp_after = "</table></body></html>";
+    Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, resp_before.to_string() + posts.unwrap_or("".to_string()).as_ref() + resp_after)))
 }
 
 fn show(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     let loc = req.extensions.get::<Router>().unwrap().find("location");
-    if loc.is_none() {
-        let resp_before = "<html><body><table><tr><th></th><th>description</th></tr>";
-        let posts = list_posts()
-                    .map(|x| x.iter()
-                         .fold(String::new(),
-                            |acc, p| acc + format!("<tr><td><a href={p}><tt>{p}</tt></a></td><td>{d}</td></tr>", p=p.0, d=p.1).as_ref()));
-        let resp_after = "</table></body></html>";
-        Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, resp_before.to_string() + posts.unwrap_or("".to_string()).as_ref() + resp_after)))
+    if let Ok(post) = find_post(&format!("posts/{}", loc.unwrap())) {
+        let mut body: String = "".to_string();
+        post.take(2048).read_to_string(&mut body);
+        let res = format!(include_str!("template.html"),
+                          title=loc.unwrap(),
+                          body=htmlescape::encode_minimal(&body),
+                          body_header="",
+                          body_footer="");
+        Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, res)))
     } else {
-        if let Ok(post) = find_post(&format!("posts/{}", loc.unwrap())) {
-            let mut body: String = "".to_string();
-            post.take(2048).read_to_string(&mut body);
-            let res = format!(include_str!("template.html"),
-                              title=loc.unwrap(),
-                              body=htmlescape::encode_minimal(&body),
-                              body_header="",
-                              body_footer="");
-            Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, res)))
-        } else {
-            Ok(iron::Response::with((status::NotFound, "")))
-        }
+        Ok(iron::Response::with((status::NotFound, "")))
     }
 }
 
@@ -121,8 +121,8 @@ fn main() {
     chain.post("/posts/new", new, "newpost");
     chain.get("/posts/new", form, "newform");
     chain.get("/posts/raw/:location", raw, "getpost");
+    chain.get("/posts/", showtable, "listpost");
     chain.get("/posts/:location", show, "showpost");
-    chain.get("/posts/", show, "listpost");
 
     iron::Iron::new(chain).http("localhost:3000").unwrap();
 }
