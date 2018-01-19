@@ -9,10 +9,10 @@
 		<title>Form</title>
 	</head>
 	<body>
-        <form action="/new" accept-charset="UTF-8" enctype="text/plain" method="post">
-        <textarea>
-        </textarea>
+        <p>Submit using following form or "$ some_command_with_output | curl -F content=@-" on your terminal.</p>
+        <form action="/posts/new" accept-charset="UTF-8" enctype="text/plain" method="post">
+        <textarea name="content"></textarea>
+        <p><input type="submit"/></p>
         </form>
-        <input type="submit" name="button"/>
 	</body>
 </html>
