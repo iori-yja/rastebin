@@ -12,10 +12,9 @@ use iron::response;
 use rand::{Rng, thread_rng};
 use router::Router;
 use std::error::Error;
-use std::fs;
+use std::{io, fs, mem};
 use std::fs::File;
 use std::prelude;
-use std::io;
 use std::io::{Read, Write, BufReader, BufWriter};
 
 fn describe_post(fname: &str) -> String {
@@ -70,26 +69,26 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
         fname = fname + "_";
         open = File::open(&fname);
     }
-    let writer = BufWriter::new(File::create(&fname).unwrap());
+    let mut writer = BufWriter::new(File::create(&fname).unwrap());
 
     let mut request_buffer = unsafe {
-        let mut buf: [u8; 16 * 1024 * 1024] = mem::ininitialized();
+        let mut buf: [u8; 16 * 1024] = mem::uninitialized();
         buf
     };
 
-    writer.write_all(&request_buffer);
-    let copied = io::copy(&mut req.body, &mut writer.unwrap());
-    match copied {
-        Ok(byte) => {
-            let time = Local::now();
-            println!("Created {} ({}bytes) at {} by request from {}", fname, byte, time, req.remote_addr);
-            let mut meta = BufWriter::new(File::create(fname.clone() + ".metadata").unwrap());
-            /* The format of metadata is CSV; specifically, see below */
-            meta.write(format!("{},{},{}", byte, time, req.remote_addr).as_bytes()).unwrap();
-            Ok(iron::Response::with((status::Ok, fname)))
-        },
-        Err(e) => Ok(iron::Response::with((status::InternalServerError, e.description()))),
+    let mut copied = 0;
+    while let Ok(c) = req.body.read(&mut request_buffer) {
+        if c == 0 {break};
+        writer.write_all(&request_buffer).unwrap();
+        copied += c;
     }
+
+    let time = Local::now();
+    println!("Created {} ({}bytes) at {} by request from {}", fname, copied, time, req.remote_addr);
+    let mut meta = BufWriter::new(File::create(fname.clone() + ".metadata").unwrap());
+    /* The format of metadata is CSV; specifically, see below */
+    meta.write(format!("{},{},{}", copied, time, req.remote_addr).as_bytes()).unwrap();
+    Ok(iron::Response::with((status::Ok, fname)))
 }
 
 fn form(_: &mut iron::Request) -> iron::IronResult<iron::Response> {
