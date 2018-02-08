@@ -19,7 +19,7 @@ use std::io::{Read, Write, BufReader, BufWriter, Cursor, SeekFrom, Seek};
 
 fn describe_post(fname: &str) -> String {
     let mut desc = String::new();
-    if let Ok(mut file) = fs::File::open(format!("metadata/{}.metadata", fname)).map(|x| BufReader::new(x)) {
+    if let Ok(mut file) = fs::File::open(format!("metadata/{}", fname)).map(|x| BufReader::new(x)) {
         file.read_to_string(&mut desc);
         return desc;
     } else {
