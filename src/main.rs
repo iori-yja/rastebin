@@ -63,34 +63,35 @@ fn generate_random_name() -> String {
 }
 
 fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
-    let mut fname = format!("posts/{}", generate_random_name());
-    let mut open = File::open(&fname);
+    let mut fname = generate_random_name();
+    let mut open = File::open(format!("posts/{}", &fname));
     while open.is_ok() {
         fname = fname + "_";
-        open = File::open(&fname);
+        open = File::open(format!("posts/{}", &fname));
     }
-    let mut writer = BufWriter::new(File::create(&fname).unwrap());
-    let mut buf: &mut [u8] = &mut [0; 4096];
+    let mut writer = BufWriter::new(File::create(format!("posts/{}", &fname)).unwrap());
+
+    let buf: &mut [u8] = &mut [0; 16 * 1024];
     let mut request_buffer = Cursor::new(buf);
 
+    let time = Local::now();
+
     let mut copied = 0;
-    /*
-    while let Ok(c) = request_buffer.write(&mut req.body) {
-        println!("{}",c);
+    while let Ok(mut c) = std::io::copy(&mut req.body, &mut request_buffer) {
         if c == 0 {break};
-        request_buffer.seek(std::io::SeekFrom::Start(10));
-        writer.write_all(&request_buffer).unwrap();
+        if copied == 0 {
+            /* our http request contains 8bytes string as a header;
+             * which is "content=" */
+            request_buffer.seek(SeekFrom::Start(8));
+            /* substitute the offset */
+            c -= 8;
+        }
+        std::io::copy(&mut request_buffer, &mut writer);
         copied += c;
     }
-    */
 
-    std::io::copy(&mut req.body, &mut request_buffer);
-    request_buffer.seek(SeekFrom::Start(8));
-    std::io::copy(&mut request_buffer, &mut writer);
-
-    let time = Local::now();
     println!("Created {} ({}bytes) at {} by request from {}", fname, copied, time, req.remote_addr);
-    let mut meta = BufWriter::new(File::create(fname.clone() + ".metadata").unwrap());
+    let mut meta = BufWriter::new(File::create(format!("metadata/{}", fname)).unwrap());
     /* The format of metadata is CSV; specifically, see below */
     meta.write(format!("{},{},{}", copied, time, req.remote_addr).as_bytes()).unwrap();
     Ok(iron::Response::with((status::Ok, fname)))
