@@ -17,17 +17,20 @@ use std::fs::File;
 use std::prelude;
 use std::io::{Read, Write, BufReader, BufWriter, Cursor, SeekFrom, Seek};
 
-fn describe_post(fname: &str) -> String {
+type PostMeta = (Option<String>, Option<String>, Option<String>);
+
+fn describe_post(fname: &str) -> PostMeta {
     let mut desc = String::new();
     if let Ok(mut file) = fs::File::open(format!("metadata/{}", fname)).map(|x| BufReader::new(x)) {
         file.read_to_string(&mut desc);
-        return desc;
+        let mut csv = desc.split(',').map(|x| x.into());
+        (csv.next(), csv.next(), csv.next())
     } else {
-        return "unknown".into();
+        return (None, None, None)
     }
 }
 
-fn list_posts() -> Option<Vec<(String, String)>> {
+fn list_posts() -> Option<Vec<(String, PostMeta)>> {
     if let Ok(posts) = fs::read_dir("posts") {
         let list = posts.map(/* map to all DirEntry */
                 |ent| ent.ok().map( /* FnOnce for Result of DirEntry */
@@ -71,23 +74,31 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     }
     let mut writer = BufWriter::new(File::create(format!("posts/{}", &fname)).unwrap());
 
-    let buf: &mut [u8] = &mut [0; 16 * 1024];
+    let mut buf: Vec<u8> = Vec::new();
     let mut request_buffer = Cursor::new(buf);
 
     let time = Local::now();
 
     let mut copied = 0;
-    while let Ok(mut c) = std::io::copy(&mut req.body, &mut request_buffer) {
-        if c == 0 {break};
-        if copied == 0 {
-            /* our http request contains 8bytes string as a header;
-             * which is "content=" */
-            request_buffer.seek(SeekFrom::Start(8));
-            /* substitute the offset */
-            c -= 8;
+    loop {
+        match std::io::copy(&mut req.body, &mut request_buffer) {
+            Ok(mut c) => {
+                if c == 0 {break};
+                if copied == 0 {
+                    /* our http request contains 8bytes string as a header;
+                     * which is "content=" */
+                    request_buffer.seek(SeekFrom::Start(8));
+                    /* substitute the offset */
+                    c -= 8;
+                }
+                std::io::copy(&mut request_buffer, &mut writer);
+                copied += c;
+            },
+            Err(e) => {
+                println!("{}", e);
+                break;
+            }
         }
-        std::io::copy(&mut request_buffer, &mut writer);
-        copied += c;
     }
 
     println!("Created {} ({}bytes) at {} by request from {}", fname, copied, time, req.remote_addr);
@@ -102,11 +113,16 @@ fn form(_: &mut iron::Request) -> iron::IronResult<iron::Response> {
 }
 
 fn showtable(_: &mut iron::Request) -> iron::IronResult<iron::Response> {
-    let resp_before = "<html><body><table><tr><th></th><th>description</th></tr>";
+        let resp_before = "<html><body><table><tr><th></th><th>size</th><th>timestamp</th><th>origin</th></tr>";
     let posts = list_posts()
                 .map(|x| x.iter()
                      .fold(String::new(),
-                        |acc, p| acc + format!("<tr><td><a href={p}><tt>{p}</tt></a></td><td>{d}</td></tr>", p=p.0, d=p.1).as_ref()));
+                        |acc, p| acc + format!("<tr><td><a href={p}><tt>{p}</tt></a></td><td align=\"right\">{d0}bytes</td><td align=\"center\">{d1}</td><td align=\"center\">{d2}</td></tr>",
+                                               p=p.0,
+                                               d0=(p.1.clone()).0.unwrap_or("?".into()),
+                                               d1=(p.1.clone()).1.unwrap_or("?".into()),
+                                               d2=(p.1.clone()).2.unwrap_or("unknown".into())).as_ref()));
+
     let resp_after = "</table></body></html>";
     Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, resp_before.to_string() + posts.unwrap_or("".to_string()).as_ref() + resp_after)))
 }
