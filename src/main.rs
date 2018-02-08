@@ -15,7 +15,7 @@ use std::error::Error;
 use std::{io, fs, mem};
 use std::fs::File;
 use std::prelude;
-use std::io::{Read, Write, BufReader, BufWriter};
+use std::io::{Read, Write, BufReader, BufWriter, Cursor, SeekFrom, Seek};
 
 fn describe_post(fname: &str) -> String {
     let mut desc = String::new();
@@ -70,18 +70,23 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
         open = File::open(&fname);
     }
     let mut writer = BufWriter::new(File::create(&fname).unwrap());
-
-    let mut request_buffer = unsafe {
-        let mut buf: [u8; 16 * 1024] = mem::uninitialized();
-        buf
-    };
+    let mut buf: &mut [u8] = &mut [0; 4096];
+    let mut request_buffer = Cursor::new(buf);
 
     let mut copied = 0;
-    while let Ok(c) = req.body.read(&mut request_buffer) {
+    /*
+    while let Ok(c) = request_buffer.write(&mut req.body) {
+        println!("{}",c);
         if c == 0 {break};
+        request_buffer.seek(std::io::SeekFrom::Start(10));
         writer.write_all(&request_buffer).unwrap();
         copied += c;
     }
+    */
+
+    std::io::copy(&mut req.body, &mut request_buffer);
+    request_buffer.seek(SeekFrom::Start(8));
+    std::io::copy(&mut request_buffer, &mut writer);
 
     let time = Local::now();
     println!("Created {} ({}bytes) at {} by request from {}", fname, copied, time, req.remote_addr);
