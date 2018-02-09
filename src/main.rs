@@ -73,17 +73,19 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
         open = File::open(format!("posts/{}", &fname));
     }
     let mut writer = BufWriter::new(File::create(format!("posts/{}", &fname)).unwrap());
-
-    req.body.read_exact(headerbuf).unwrap();
+ 
+    /* consume first 8bytes which is the length of "content=" which is the post message from web */
+    let mut headerbuf: [u8; 8] = [0; 8];
+    req.body.read_exact(&mut headerbuf).unwrap();
     let time = Local::now();
 
     let copied = std::io::copy(&mut req.body, &mut writer).unwrap_or(0);
 
-    println!("Created {} ({}bytes) at {} by request from {}", fname, copied, time, req.remote_addr);
     let mut meta = BufWriter::new(File::create(format!("metadata/{}", fname)).unwrap());
     /* The format of metadata is CSV; specifically, see below */
     meta.write(format!("{},{},{}", copied, time, req.remote_addr).as_bytes()).unwrap();
-    Ok(iron::Response::with((status::Ok, fname)))
+    println!("Created {} ({}bytes) at {} by request from {}", fname, copied, time, req.remote_addr);
+    Ok(iron::Response::with((iron::headers::ContentType::html().0, status::Ok, format!("<html><body><a href=\"{f}\">{f}</a></body></html>", f=fname))))
 }
 
 fn form(_: &mut iron::Request) -> iron::IronResult<iron::Response> {
