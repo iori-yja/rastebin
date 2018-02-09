@@ -74,32 +74,10 @@ fn new(req: &mut iron::Request) -> iron::IronResult<iron::Response> {
     }
     let mut writer = BufWriter::new(File::create(format!("posts/{}", &fname)).unwrap());
 
-    let mut buf: Vec<u8> = Vec::new();
-    let mut request_buffer = Cursor::new(buf);
-
+    req.body.read_exact(headerbuf).unwrap();
     let time = Local::now();
 
-    let mut copied = 0;
-    loop {
-        match std::io::copy(&mut req.body, &mut request_buffer) {
-            Ok(mut c) => {
-                if c == 0 {break};
-                if copied == 0 {
-                    /* our http request contains 8bytes string as a header;
-                     * which is "content=" */
-                    request_buffer.seek(SeekFrom::Start(8));
-                    /* substitute the offset */
-                    c -= 8;
-                }
-                std::io::copy(&mut request_buffer, &mut writer);
-                copied += c;
-            },
-            Err(e) => {
-                println!("{}", e);
-                break;
-            }
-        }
-    }
+    let copied = std::io::copy(&mut req.body, &mut writer).unwrap_or(0);
 
     println!("Created {} ({}bytes) at {} by request from {}", fname, copied, time, req.remote_addr);
     let mut meta = BufWriter::new(File::create(format!("metadata/{}", fname)).unwrap());
